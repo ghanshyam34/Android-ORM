@@ -1,0 +1,179 @@
+I have used ORMLite for storing and retrieveing data from and to database in android below or some simple steps to insert user detail into database through ORM
+
+
+(1)first we need library for ormlite we can download lib or use dependency in gradle like
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')  
+    compile group: 'com.j256.ormlite', name: 'ormlite-android', version: '4.45'
+}
+
+
+(2) we need to create pojo class User
+
+    public class User {
+
+    @DatabaseField(unique = true,dataType = DataType.STRING)
+    String email;
+    @DatabaseField(canBeNull = false,dataType = DataType.STRING)
+    String pwd; 
+    public String getEmail() {
+        return email;
+    }
+    public void setEmail(String email) {
+        this.email = email;
+    }
+    public String getPwd() {
+        return pwd;
+    }
+    public void setPwd(String pwd) {
+        this.pwd = pwd;
+    }
+}  
+
+
+(3)We need to create helper class to manage database creation and version management
+
+
+    public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
+
+	private static final String DATABASE_NAME = "databasename.db";
+	private static final int DATABASE_VERSION = 1;
+	private Dao<User, Integer> dao = null;
+	private RuntimeExceptionDao<User, Integer> runtimeDao = null;
+	static  DatabaseHelper databaseHelper;
+	public static synchronized DatabaseHelper getInstance(Context context){
+		if(databaseHelper== null){
+			databaseHelper= new DatabaseHelper(context);
+		}
+		return databaseHelper;
+	}
+	public DatabaseHelper(Context context) {
+		super(context, DATABASE_NAME, null, DATABASE_VERSION);
+	}
+
+	/**
+	 * This is called when the database is first created. Usually you should call createTable statements here to create
+	 * the tables that will store your data.
+	 */
+	@Override
+	public void onCreate(SQLiteDatabase db, ConnectionSource connectionSource) {
+		try {
+			Log.i(DatabaseHelper.class.getName(), "onCreate");
+			TableUtils.createTable(connectionSource, User.class);
+		} catch (SQLException e) {
+			Log.e(DatabaseHelper.class.getName(), "Can't create database", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	/**
+	 * This is called when your application is upgraded and it has a higher version number. This allows you to adjust
+	 * the various data to match the new version number.
+	 */
+	@Override
+	public void onUpgrade(SQLiteDatabase db, ConnectionSource connectionSource, int oldVersion, int newVersion) {
+
+	}
+
+	/**
+	 * Returns the Database Access Object (DAO) for our User class. It will create it or just give the cached
+	 * value.
+	 */
+	public synchronized Dao<User, Integer> getDAO() throws SQLException {
+		if (dao == null) {
+			dao = getDao(User.class);
+		}
+		return dao;
+	}
+	
+	/**
+	 * Returns the RuntimeExceptionDao (Database Access Object) version of a Dao for our User  class. It will
+	 * create it or just give the cached value. RuntimeExceptionDao only through RuntimeExceptions.
+	 */
+	public synchronized RuntimeExceptionDao<User, Integer> getRuntimeDao() {
+
+		if (runtimeDao == null) {
+			runtimeDao = getRuntimeExceptionDao(User.class);
+		}
+		return runtimeDao;
+	}
+
+
+
+(4) we can insert user into table through DatabaseHelper class from activity or fragment wherever you want
+
+    User user = new User();
+    user.setEmail("xyz@gmail.com");
+    user.setPwd("1234");
+
+
+
+ //this below will insert user into table
+   
+
+     public boolean insertUserIntoTable(User user){
+        int rowaffected = 0;
+        try {
+            RuntimeExceptionDao<User, Integer> dao = DatabaseHelper.getInstance(context);
+.getRuntimeDao();
+            long millis = System.currentTimeMillis();
+            rowaffected = dao.create(user);         
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+
+        }
+        return (rowaffected == 0) ? false : true;
+ }
+
+ 
+
+//this will get user from database
+
+    public User getUser(String email,String pwd){
+
+        User user = null;
+
+        QueryBuilder<User, Integer> qb = null;
+        try {
+            qb =  DatabaseHelper.getInstance(context).getDAO().queryBuilder();
+            qb.where().eq("email",email).and().eq("pwd",pwd);
+            user = qb.queryForFirst();
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }finally {
+
+        }
+        return user;
+    }
+
+
+
+  //this will update the user in database
+ 
+
+      public boolean updateUser(User user){
+        try {
+
+            Dao<User, Integer> dao = databaseHelper.getDAO();
+            UpdateBuilder<User, Integer> updateBuilder = dao.updateBuilder();
+            
+            updateBuilder.updateColumnValue("email", user.getEmail());
+            updateBuilder.updateColumnValue("pwd", user.getPwd());
+            updateBuilder.where().eq("email", user.getEmail());
+            int row = dao.update(updateBuilder.prepare());
+
+            if(row == 0)
+                return false;
+            else
+                return true;
+
+        }catch (SQLException e){
+            e.printStackTrace();
+        }finally {
+        }
+        return false;
+    }
